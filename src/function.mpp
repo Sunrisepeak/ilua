@@ -1,0 +1,59 @@
+module;
+
+#include <lua.hpp>
+
+export module ilua_function;
+
+import std;
+
+// function
+import ilua_function_signature;
+
+namespace ilua_private {
+
+export template <typename Fn>
+class Function {
+
+    std::string mName__;
+    Fn mFn__;
+
+public: // type
+
+    using RType = function::function_signature<Fn>::RType;
+    using ArgsTupleType = function::function_signature<Fn>::Args;
+
+public:
+    explicit Function(std::string name, Fn f)
+        : mName__ { name }, mFn__ { std::move(f) } { }
+
+    template <typename... InputArgs>
+    RType operator()(InputArgs... args) const {
+        // Note: Args / use InputArgs to avoid conflict with ArgsTupleType
+
+        constexpr std::size_t InputArgsN = sizeof...(InputArgs);
+        constexpr std::size_t ArgsN = std::tuple_size<ArgsTupleType>::value;
+
+        static_assert(InputArgsN == ArgsN, "function args match error");
+
+        return mFn__(args...);
+    }
+
+    RType operator()() const {
+        return mFn__();
+    }
+
+public:
+    std::string getName() const { return mName__; }
+    Fn & getFn() { return mFn__; }
+};
+
+template <typename T>
+struct is_Function : std::false_type {};
+
+template <typename Fn>
+struct is_Function<Function<Fn>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_Function_v = is_Function<std::remove_cv_t<std::remove_reference_t<T>>>::value;
+
+}

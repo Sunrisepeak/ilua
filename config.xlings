@@ -1,0 +1,8 @@
+xname = "ilua"
+
+xversion = "0.0.1"
+
+xim = {
+    gcc = "15.1.0",
+    -- xmake = "3.0.4",
+}

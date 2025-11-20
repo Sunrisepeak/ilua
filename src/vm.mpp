@@ -1,0 +1,85 @@
+export module ilua_vm;
+
+import std;
+
+import ilua_lua;
+
+import ilua_function;
+import ilua_function_core;
+
+export namespace ilua_private {
+
+class LuaVM final {
+    lua_api::lua_State* mLuaState;
+
+    LuaVM() : mLuaState(lua_api::luaL_newstate()) {
+        lua_api::luaL_openlibs(mLuaState);
+    }
+
+public:
+
+    LuaVM(const LuaVM &) = delete;
+    LuaVM & operator=(const LuaVM &) = delete;
+
+    LuaVM(LuaVM &&obj) : mLuaState { obj.mLuaState } {
+        obj.mLuaState = nullptr;
+    }
+
+    LuaVM & operator=(LuaVM &&obj) {
+        mLuaState = obj.mLuaState;
+        obj.mLuaState = nullptr;
+        return *this;
+    }
+
+    static LuaVM create() {
+        return LuaVM(); // std::move by RVO
+    }
+
+    ~LuaVM() {
+        if (mLuaState) {
+            lua_api::lua_close(mLuaState);
+        }
+    }
+
+public:
+
+    template <typename T>
+    void set_function(ilua_private::Function<T> &fn) {
+        ilua_private::function::set_function(
+            mLuaState,
+            fn.getName().c_str(), fn.getFn()
+        );
+    }
+
+    template <typename FunctionType>
+    auto set_function(const char *name, FunctionType &&fn) {
+        ilua_private::Function f { name, fn };
+        set_function(f);
+        return f;
+    }
+
+    void run(std::string code) {
+        auto status = lua_api::dostring(mLuaState, code);
+        if (status != lua_api::Status::OK) {
+            const char* error_msg = lua_api::tostring(mLuaState, -1);
+            std::cerr << "Lua error: " << error_msg << std::endl;
+            lua_api::pop(mLuaState, 1);
+        }
+    }
+
+    void script(std::string script) {
+        auto status = lua_api::dofile(mLuaState, script);
+        if (status != lua_api::Status::OK) {
+            const char* error_msg = lua_api::tostring(mLuaState, -1);
+            std::cerr << "Lua error: " << error_msg << std::endl;
+            lua_api::pop(mLuaState, 1);
+        }
+    }
+
+public: // stack op
+
+
+
+}; // LuaVM
+
+} // ilua namespace

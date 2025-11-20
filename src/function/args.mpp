@@ -1,0 +1,31 @@
+export module ilua_function_args;
+
+import std;
+
+import ilua_lua;
+import ilua_stack;
+
+namespace ilua_private {
+export namespace function {
+
+template <typename Tuple, std::size_t... I>
+Tuple read_args_impl(lua_api::lua_State* L, std::index_sequence<I...>) {
+    // Lua 栈从 1 开始
+    return Tuple{ StackOP::pop<std::tuple_element_t<I, Tuple> >(L, static_cast<int>(I) + 1)... };
+}
+
+template <typename... Args>
+std::tuple<Args...> read_args(lua_api::lua_State* L) {
+    constexpr std::size_t N = sizeof...(Args);
+
+    static_assert(N != 0, " xxxxxxxxxxxxxxxxxxx ");
+
+    if (lua_api::lua_gettop(L) < (int)N) {
+        lua_api::luaL_error(L, "expected %zu arguments, got %d", N, lua_api::lua_gettop(L));
+    }
+
+    return read_args_impl<std::tuple<Args...>>(L, std::make_index_sequence<N>{});
+}
+
+} // namespace function
+}

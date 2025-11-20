@@ -1,0 +1,81 @@
+module;
+
+#include <lua.hpp>
+
+export module ilua_function_core;
+
+import std;
+
+// function
+import ilua_function_callable;
+import ilua_function_signature;
+
+namespace ilua_private {
+namespace function {
+
+static const char* const META_NAME = "ilua.love.lua";
+
+int function_gc(lua_State* L) {
+    // 获取绑定的可调用对象
+    void* mem = lua_touserdata(L, 1);
+    if (mem) {
+        callable_base** slot = static_cast<callable_base**>(mem);
+        delete *slot; // 删除对象
+        *slot = nullptr;
+    }
+    return 0;
+}
+
+void ensure_metatable(lua_State* L) {
+    if (luaL_newmetatable(L, META_NAME)) {
+        // 栈顶是新的 metatable
+        lua_pushcfunction(L, function_gc);
+        lua_setfield(L, -2, "__gc");
+    }
+    // 弹出metatable 
+    lua_pop(L, 1);
+}
+
+
+int function_entry(lua_State* L) {
+    // upvalue[1] = full userdata (包含 callable_base*
+    callable_base** slot = static_cast<callable_base**>(lua_touserdata(L, lua_upvalueindex(1)));
+    callable_base* cb = slot ? *slot : nullptr;
+    if (!cb) {
+        lua_pushliteral(L, "callable is null");
+        return lua_error(L);
+    }
+    return cb->invoke(L);
+}
+
+//======================= 创建并压入闭包 =======================
+
+void set_metatable(lua_State* L) {
+    luaL_getmetatable(L, META_NAME);
+    lua_setmetatable(L, -2);
+}
+
+template <typename CB>
+void push_callable(lua_State* L, CB* cb_ptr) {
+    // 创建 full userdata，存放 callable_base*
+    void* mem = lua_newuserdatauv(L, sizeof(callable_base*), 0);
+    auto** slot = static_cast<callable_base**>(mem);
+    *slot = cb_ptr;
+    // 设 metatable（含 __gc）
+    set_metatable(L);
+    // 以该 userdata 为 upvalue 创建闭包
+    lua_pushcclosure(L, &function_entry, 1);
+}
+
+//======================= 注册函数 =======================
+
+export template <typename Fn>
+void set_function(lua_State* L, const char* name, Fn&& fn) {
+    ensure_metatable(L);
+    auto* obj = new callable<std::decay_t<Fn>>(std::forward<Fn>(fn));
+    push_callable(L, obj); // 栈顶是 C 闭包
+    lua_setglobal(L, name);
+}
+
+}
+}

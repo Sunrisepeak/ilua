@@ -1,0 +1,32 @@
+module;
+
+#include <lua.hpp>
+
+export module ilua_lua;
+
+import std;
+
+export namespace lua_api {
+    using lua_State = ::lua_State;
+    using lua_CFunction = ::lua_CFunction;
+
+    enum Status {
+        OK = LUA_OK,
+    };
+
+    // api-1: ...
+    auto luaL_newstate() { return ::luaL_newstate(); }
+    auto lua_close(lua_State *L) { return ::lua_close(L); }
+    auto luaL_openlibs(lua_State *L) { return ::luaL_openlibs(L); }
+
+    // function/args
+    auto lua_gettop(lua_State *L) { return ::lua_gettop(L); }
+    auto luaL_error(lua_State *L, const char *msg, const std::size_t& n, int) { return ::luaL_error(L, msg, n); }
+
+    // macro
+    auto pop(lua_State *L, int index) { return lua_pop(L, index); }
+    auto tostring(lua_State *L, int index) { return lua_tostring(L, index); }
+
+    auto dostring(lua_State *L, const std::string &code) { return luaL_dostring(L, code.c_str()); }
+    auto dofile(lua_State *L, const std::string &script) { return luaL_dofile(L, script.c_str()); }
+}

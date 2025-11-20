@@ -1,0 +1,49 @@
+module;
+
+#include <lua.hpp>
+
+export module ilua_stack;
+
+import std;
+
+import ilua_lua;
+
+using namespace lua_api;
+
+export namespace ilua_private {
+
+struct StackOP {
+    template <typename T>
+    static T pop(lua_State* L, int idx/*, auto*/) {
+        if constexpr (std::is_same_v<T, bool>) return lua_toboolean(L, idx) != 0;
+        else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+            auto v = luaL_checkinteger(L, idx);
+            return static_cast<T>(v);
+        } else if constexpr (std::is_floating_point_v<T>) {
+            auto v = luaL_checknumber(L, idx);
+            return static_cast<T>(v);
+        } else {
+            static_assert(sizeof(T) == 0, "StackOP::get<T>: unsupported type");
+        }
+    }
+
+    template <typename T>
+    static int push(lua_State* L, T value) {
+        if constexpr (std::is_same_v<T, bool>)
+            lua_pushboolean(L, std::forward<T>(value));
+        else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+            lua_pushinteger(L, std::forward<T>(value));
+        } else if constexpr (std::is_floating_point_v<T>) {
+            lua_pushnumber(L, std::forward<T>(value));
+        } else {
+            static_assert(sizeof(T) == 0, "StackOP::push<T>: unsupported type");
+        }
+        return 1; // TODO: ret status?
+    }
+
+    //static int push(lua_State* L) { }
+};
+
+//template <> inline int StackOP::push<void>(lua_State* L, void) { }
+
+}

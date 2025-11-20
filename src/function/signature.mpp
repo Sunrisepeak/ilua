@@ -1,0 +1,52 @@
+export module ilua_function_signature;
+
+import std;
+
+import ilua_lua;
+
+namespace ilua_private {
+export namespace function {
+
+template <typename T>
+struct function_signature;
+
+// 函数指针 - 通过特化获取返回值和参数列表类型
+template <typename R, typename... A>
+struct function_signature<R(*)(A...)> {
+    using RType = R;
+    using Args = std::tuple<A...>;
+};
+
+// 可调用对象 / lambda：用 &T::operator() 推导
+template <typename T>
+struct function_signature {
+private:
+  using call_t = function_signature<decltype(&T::operator())>;
+public:
+  using RType   = typename call_t::RType;
+  using Args  = typename call_t::Args;
+};
+
+// 成员函数指针（const）
+template <typename C, class R, typename... A>
+struct function_signature<R(C::*)(A...) const> {
+    using RType = R;
+    using Args = std::tuple<A...>;
+};
+
+// 成员函数指针（非 const）
+template <typename C, class R, typename... A>
+struct function_signature<R(C::*)(A...)> {
+    using RType = R;
+    using Args = std::tuple<A...>;
+};
+
+// 特判 lua_CFunction：保持原样（手动操作栈）
+template <>
+struct function_signature<lua_api::lua_CFunction> {
+    using RType = int;
+    using Args = std::tuple<lua_api::lua_State*>;
+};
+
+}
+}

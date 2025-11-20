@@ -1,0 +1,11 @@
+export module ilua;
+
+import ilua_vm;
+import ilua_function;
+
+export namespace ilua { // user public api
+    using LuaVM = ilua_private::LuaVM;
+
+    template <typename Fn>
+    using Function = ilua_private::Function<Fn>;
+}

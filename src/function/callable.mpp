@@ -1,0 +1,60 @@
+export module ilua_function_callable;
+
+import std;
+
+import ilua_lua;
+import ilua_stack;
+
+// function
+import ilua_function_signature;
+import ilua_function_args;
+
+namespace ilua_private {
+export namespace function {
+
+struct callable_base {
+    virtual int invoke(lua_api::lua_State* L) = 0;
+    virtual ~callable_base() {}
+};
+
+template <typename Fn, typename Tuple, std::size_t... I>
+int invoke_tuple_impl(lua_api::lua_State* L, Fn& fn, Tuple*, std::index_sequence<I...>) {
+    using R = typename function_signature<Fn>::RType;
+    if constexpr (std::tuple_size<Tuple>::value == 0 && std::is_void_v<R>) {
+        fn(); return 0;
+    } else if constexpr (std::tuple_size<Tuple>::value == 0) {
+        return StackOP::push(L, fn());
+    } else {
+        auto args = read_args<std::tuple_element_t<I, Tuple>...>(L);
+        if constexpr (std::is_void_v<R>) {
+            std::apply(fn, args); return 0;
+        } else {
+            return StackOP::push(L, std::apply(fn, args));
+        }
+    }
+}
+
+template <typename Fn, typename Tuple>
+int invoke_tuple(lua_api::lua_State* L, Fn& fn, Tuple*) {
+    return invoke_tuple_impl(L, fn, (Tuple*)nullptr, std::make_index_sequence<std::tuple_size<Tuple>::value>{});
+}
+
+template <typename Fn>
+struct callable : callable_base {
+    Fn fn;
+
+    explicit callable(Fn f) : fn(std::move(f)) {}
+
+    int invoke(lua_api::lua_State* L) override {
+        using Args = typename function_signature<Fn>::Args;
+        using R    = typename function_signature<Fn>::RType;
+        if constexpr (std::is_same_v<Args, std::tuple<lua_api::lua_State*>> && std::is_same_v<R, int>) {
+            return fn(L);
+        } else {
+            return invoke_tuple(L, fn, (Args*)nullptr);
+        }
+    }
+};
+
+} // namespace function
+}
